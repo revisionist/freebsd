@@ -49,13 +49,13 @@ main() {
     exit 1
   fi
 
-  if [ $level -lt 0 ]; then
-    echo 'Please specify a level in range 0 to '${DEEPEST_LEVEL}
+  if [[ ! $level =~ ^-?[0-9]+$ ]]; then
+    echo "Level must be an integer"
     exit 1
   fi
 
-  if [[ ! $level =~ ^-?[0-9]+$ ]]; then
-    echo "Level must be an integer"
+  if [ $level -lt 0 ]; then
+    echo 'Please specify a level in range 0 to '${DEEPEST_LEVEL}
     exit 1
   fi
 
@@ -64,12 +64,12 @@ main() {
     exit 1
   fi
 
-  if [ ! -x backup_dir ]; then
+  if [ ! -d $backup_dir ]; then
     echo 'Backup directory does not exist: '$backup_dir
-    exit 1
+   # exit 1
   fi
 
-  if [ ! -w backup_dir ]; then
+  if [ ! -w $backup_dir ]; then
     echo 'Backup directory is not writeable: '$backup_dir
     exit 1
   fi
