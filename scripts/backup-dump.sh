@@ -1,8 +1,7 @@
 #!/usr/local/bin/bash
 
-# $Id: $
-
 # Backup script written by David Goddard for FreeBSD systems using Dump
+
 
 DATE=`date +%Y.%m.%d`
 DATE_LONG=`date +%Y%m%d-%H%M`
@@ -10,7 +9,9 @@ DATE_LONG2=`date`
 DEFAULT_BACKUPDIR='/backup/dump'
 DEFAULT_LOGFILE='/var/log/backup-dump.log'
 HOST=`hostname -s`
-FILE_SUFFIX=".dmp"
+FILE_SUFFIX="dmp"
+GPG_CMD="gpg"
+GPG_SUFFIX="enc"
 DEEPEST_LEVEL=5
 
 
@@ -20,10 +21,13 @@ main() {
   logfile=${DEFAULT_LOGFILE}
   level=-1
   filesystem=""
+  compression=""
+  gpgkey=""
+  nodump=0
   umask 026
 
   OPTIND=1
-  while getopts "h?l:d:t:o:" opt; do
+  while getopts "h?l:d:t:o:c:e:n:" opt; do
       case "$opt" in
       h|\?)
           show_help
@@ -34,6 +38,12 @@ main() {
       t)  backup_dir=$OPTARG
           ;;
       o)  logfile=$OPTARG
+          ;;
+      c)  compression=$OPTARG
+          ;;
+      e)  gpgkey=$OPTARG
+          ;;
+      n)  nodump=$OPTARG
           ;;
       esac
   done
@@ -74,11 +84,25 @@ main() {
     exit 1
   fi
 
+  if [ ! -z $compression ]; then
+	  if [ ! -x "$(command -v $compression)" ]; then
+		echo 'Compression is not valid: '$compression
+		exit 1
+	fi
+  fi
+  
+  if [ ! -z $nodump ]; then
+    if [[ ! $nodump =~ ^-?[0-9]+$ ]]; then
+		echo "Nodump level must be an integer"
+		exit 1
+	fi
+  fi
+
   echo "Will perform level ${level} backups of ${filesystem_count} filesystems: "${filesystems[*]}
 
-  for ds in "${filesystems[@]}"
+  for fs in "${filesystems[@]}"
   do
-    backup_filesystem $ds
+    backup_filesystem $fs
   done
 
   echo "Processed ${filesystem_count} filesystems: "${filesystems[*]}
@@ -89,15 +113,18 @@ main() {
 show_help () {
 
   usage="
-  $(basename "$0") [-h] [-t] [-o] -l <filesystems> -- incrementally back up ZFS filesystems to compressed files
+  $(basename "$0") [-h] [-t] [-o] [-e] -l <filesystems> -- incrementally back up FreeBSD filesystems to compressed files
 
   where:
     -h  show this help text
     -l  backup level (in range 0-${DEEPEST_LEVEL})
     -t  directory to output backups to (default: ${DEFAULT_BACKUPDIR})
     -o  log file to write to (default: ${DEFAULT_LOGFILE})
+    -c  compression to use (i.e. /usr/bin/bzip2)
+    -e  encrypt using GPG key
+    -n  level to honour 'nodump' flag [i.e. -h parameter to dump(8)] (default: 0)
 
-    <filesystems> - list of ZFS data sets to back up, separated by spaces
+    <filesystems> - list of filesystems sets to back up, separated by spaces
 
   For example:
 
@@ -124,7 +151,7 @@ backup_filesystem () {
 
   filesystem=$1
 
-  filesystem_test=`zfs list | cut -d ' ' -f 1 | grep -c \^${filesystem}\$`
+  filesystem_test=`mount | cut -d ' ' -f 3 | grep -c \^${filesystem}\$`
   if [ $filesystem_test -eq 0 ]; then
     echo 'Target filesystem does not exist: '$filesystem
     return 1
@@ -138,65 +165,71 @@ backup_filesystem () {
   filesystem_name_safe=${filesystem//\//-}
   #echo "filesystem name: "$filesystem_name_safe
 
-  this_snapshot_name='backup-level-'${level}
-  prior_snapshot_name=''
+  this_dump_name='backup-level-'${level}
+  prior_dump_name=''
 
-  declare -a snapshots_to_delete
+  declare -a dumps_to_delete
   for (( lev=$DEEPEST_LEVEL; lev>=($level-1); lev-- ))
   do
     this_name='backup-level-'${lev}
     if [ $lev -lt $level ]; then
       if [ $level -eq 0 ]; then
-        prior_snapshot_name=''  # special case
+        prior_dump_name=''  # special case
       else
-        prior_snapshot_name=${this_name}
+        prior_dump_name=${this_name}
       fi
     else
-      snapshots_to_delete+=(${this_name})
+      dumps_to_delete+=(${this_name})
     fi
   done
 
-  echo "Will delete these snapshots if they exist: "${snapshots_to_delete[*]}
-  echo "Will create snapshot: "${this_snapshot_name}
+  echo "Will delete these dumps if they exist: "${dumps_to_delete[*]}
+  echo "Will create dump: "${this_dump_name}
   if [ $level -eq 0 ]; then
-    echo "Will send full data for level 0"
+    echo "Will DO SOMETHING SPECIAL for level 0"#TODO
   else
-    echo "Will send incremental changes since: "${prior_snapshot_name}
+    echo "This will be incremental since: "${prior_dump_name}
   fi
-
-  for del in "${snapshots_to_delete[@]}"
-  do
-    exist_count=`zfs list -t snapshot -o name,creation -s creation -r ${filesystem} | tail -1 | cut -d ' ' -f 1 | grep -c \@${del}\$`
-    if [ $exist_count -gt 0 ]; then
-      delete_snapshot=${filesystem}'@'${del}
-      echo "Destroying existing snapshot: $delete_snapshot"
-      zfs destroy $delete_snapshot
-    fi
-  done
-
-  create_snapshot=${filesystem}'@'${this_snapshot_name}
-
-  echo "Creating snapshot: $create_snapshot"
-  zfs snapshot ${create_snapshot}
 
   # Delete matching and lower level backup files
   echo "Deleting old backup files..."
   for (( lev=$DEEPEST_LEVEL; lev>=($level); lev-- ))
   do
-    deletefilepattern=`echo *'-'$HOST'-'$filesystem_name_safe'-level'$lev$FILE_SUFFIX`
-    #echo "Deleting past files: "$deletefilepattern
+    deletefilepattern=`echo *'-'$HOST$filesystem_name_safe'-level'$lev'.'$FILE_SUFFIX'*'`
+    echo "Deleting past files: "$deletefilepattern
     rm -f ${backup_dir}/${deletefilepattern}
-    rm -f ${backup_dir}/${deletefilepattern}.bz2
   done
 
-  outputfile=`echo $DATE_LONG'-'$HOST'-'$filesystem_name_safe'-level'$level$FILE_SUFFIX`
-  echo "Sending to new file: "$outputfile".bz2"
+  outputfile=`echo $DATE_LONG'-'$HOST$filesystem_name_safe'-level'$level'.'$FILE_SUFFIX`
+  dumpcmd="dump -${level} -L -h ${nodump} -u -a -f - "${filesystem} 
 
-  if [ $level -gt 0 ]; then
-    zfs send -i ${filesystem}'@'${prior_snapshot_name} ${filesystem}'@'${this_snapshot_name} | bzip2 > ${backup_dir}/${outputfile}.bz2
-  else
-    zfs send ${filesystem}'@'${this_snapshot_name} | bzip2 > ${backup_dir}/${outputfile}.bz2
+  if [ ! -z ${compression} ]; then
+	compressionsuffix=`echo ${compression} | rev | cut -d '/' -f 1 | rev`
+	if [ ${compressionsuffix} == 'bzip2' ]; then
+		compressionsuffix="bz2"
+	elif [ ${compressionsuffix} == 'gzip' ]; then
+		compressionsuffix="gz"
+	fi
+	echo "Will compress using: "${compression}
+	echo "Adding suffix: "${compressionsuffix}
+	dumpcmd="${dumpcmd} | ${compression}"
+	outputfile="${outputfile}.${compressionsuffix}"
   fi
+
+  if [ ! -z $gpgkey ]; then
+	outputfile="${outputfile}.${GPG_SUFFIX}"
+	echo "Encrypting using GPG key: "${gpgkey}
+	dumpcmd="${dumpcmd} | ${GPG_CMD} --encrypt --recipient ${gpgkey}"
+  fi
+
+  outputpath="${backup_dir}/${outputfile}"
+  dumpcmd="${dumpcmd} > ${outputpath}"
+
+  echo "Dump command: "${dumpcmd}
+  echo "Output file: "${outputfile}
+  echo "Output path: "${outputpath}
+
+  eval ${dumpcmd}
 
   # Enter end log entry:
   echo `date +%Y-%m-%d`" "`date +%T`" - dump - F - level "${level}" - "${filesystem} >> ${logfile}
