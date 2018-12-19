@@ -165,7 +165,7 @@ backup_filesystem () {
   filesystem_name_safe=${filesystem//\//-}
   #echo "filesystem name: "$filesystem_name_safe
   if [ $filesystem_name_safe == '-' ]; then
-    filesystem_name_safe="root"
+    filesystem_name_safe="-root"
   fi
 
   this_dump_name='backup-level-'${level}
