@@ -168,31 +168,7 @@ backup_filesystem () {
     filesystem_name_safe="-root"
   fi
 
-  this_dump_name='backup-level-'${level}
-  prior_dump_name=''
-
-  declare -a dumps_to_delete
-  for (( lev=$DEEPEST_LEVEL; lev>=($level-1); lev-- ))
-  do
-    this_name='backup-level-'${lev}
-    if [ $lev -lt $level ]; then
-      if [ $level -eq 0 ]; then
-        prior_dump_name=''  # special case
-      else
-        prior_dump_name=${this_name}
-      fi
-    else
-      dumps_to_delete+=(${this_name})
-    fi
-  done
-
-  echo "Will delete these dumps if they exist: "${dumps_to_delete[*]}
   echo "Will create dump: "${this_dump_name}
-  if [ $level -eq 0 ]; then
-    echo "Will DO SOMETHING SPECIAL for level 0"#TODO
-  else
-    echo "This will be incremental since: "${prior_dump_name}
-  fi
 
   # Delete matching and lower level backup files
   echo "Deleting old backup files..."
@@ -214,7 +190,7 @@ backup_filesystem () {
 		compressionsuffix="gz"
 	fi
 	echo "Will compress using: "${compression}
-	echo "Adding suffix: "${compressionsuffix}
+	#echo "Adding suffix: "${compressionsuffix}
 	dumpcmd="${dumpcmd} | ${compression}"
 	outputfile="${outputfile}.${compressionsuffix}"
   fi
@@ -228,9 +204,9 @@ backup_filesystem () {
   outputpath="${backup_dir}/${outputfile}"
   dumpcmd="${dumpcmd} > ${outputpath}"
 
-  echo "Dump command: "${dumpcmd}
-  echo "Output file: "${outputfile}
-  echo "Output path: "${outputpath}
+  echo "Executing dump command: "${dumpcmd}
+  #echo "Output file: "${outputfile}
+  #echo "Output path: "${outputpath}
 
   eval ${dumpcmd}
 
