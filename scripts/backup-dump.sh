@@ -168,14 +168,12 @@ backup_filesystem () {
     filesystem_name_safe="-root"
   fi
 
-  echo "Will create dump: "${this_dump_name}
-
   # Delete matching and lower level backup files
   echo "Deleting old backup files..."
   for (( lev=$DEEPEST_LEVEL; lev>=($level); lev-- ))
   do
     deletefilepattern=`echo *'-'$HOST$filesystem_name_safe'-level'$lev'.'$FILE_SUFFIX'*'`
-    echo "Deleting past files: "$deletefilepattern
+    #echo "Deleting past files: "$deletefilepattern
     rm -f ${backup_dir}/${deletefilepattern}
   done
 
