@@ -186,6 +186,8 @@ backup_filesystem () {
 	compressionsuffix=`echo ${compression} | rev | cut -d '/' -f 1 | rev`
 	if [ ${compressionsuffix} == 'bzip2' ]; then
 		compressionsuffix="bz2"
+	if [ ${compressionsuffix} == 'pbzip2' ]; then
+		compressionsuffix="bz2"
 	elif [ ${compressionsuffix} == 'gzip' ]; then
 		compressionsuffix="gz"
 	fi
