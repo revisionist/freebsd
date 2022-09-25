@@ -95,8 +95,6 @@ main() {
   if ! test_remote_directory $remote_parentdir ; then
     echo 'Remote mail directory does not exist: '$remote_parentdir
     exit 1
-  else
-    echo 'Remote mail directory exists: '$remote_parentdir
   fi
 
   for subdir in "${mailsubdirs[@]}"
@@ -167,7 +165,7 @@ send_directory () {
   local_dir=${local_parentdir}/${directory}
 
   # Enter start log entry:
-  echo `date +%Y-%m-%d`" "`date +%T`" - sending "${local_dir} >> ${logfile}
+  echo `date +%Y-%m-%d`" "`date +%T`" - sending ${local_dir} to ${remote_host}" >> ${logfile}
 
   if [ ! -d $local_dir ]; then
     echo 'Directory send failure - does not exist locally: '$local_dir
@@ -177,7 +175,7 @@ send_directory () {
   /usr/local/bin/rsync -va --no-r -d -e 'ssh -p '${remote_port} --delete-after --exclude 'CVS' $local_dir/ ${remote_user}@${remote_host}:${remote_parentdir}/${directory}/ >> ${logfile}
 
   # Enter end log entry:
-  echo `date +%Y-%m-%d`" "`date +%T`" - sent "${local_dir} >> ${logfile}
+  echo `date +%Y-%m-%d`" "`date +%T`" - sent ${remote_host}:${local_dir}" >> ${logfile}
 
 }
 
