@@ -117,8 +117,8 @@ show_help () {
   where:
     -h  show this help text
     -d  local parent directory containing virtual mail subdirs (default: ${DEFAULT_LOCAL_DIR})
-    -d  remote parent directory containing virtual mail subdirs (default: ${DEFAULT_LOCAL_DIR})
-    -o  log file to write to (default: ${DEFAULT_LOGFILE})
+    -D  remote parent directory containing virtual mail subdirs (default: ${DEFAULT_LOCAL_DIR})
+    -l  log file to write to (default: ${DEFAULT_LOGFILE})
     -r  remote host
     -p  remote port to (default: ${DEFAULT_REMOTE_PORT})
     -u  remote user (default: ${DEFAULT_REMOTE_USER})
@@ -143,7 +143,7 @@ show_help () {
 
 test_remote_directory () {
 
-  echo "Testing that remote directory exists: "$1
+  #echo "Testing that remote directory exists: "$1
 
   test_cmd="ssh -p $remote_port -tt $remote_user@$remote_host 'test -d ${1}'"
   #echo "test_cmd: "${test_cmd}
@@ -168,7 +168,6 @@ send_directory () {
 
   # Enter start log entry:
   echo `date +%Y-%m-%d`" "`date +%T`" - sending "${local_dir} >> ${logfile}
-
 
   if [ ! -d $local_dir ]; then
     echo 'Directory send failure - does not exist locally: '$local_dir
