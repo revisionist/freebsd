@@ -132,12 +132,12 @@ test_remote_file () {
 send_file () {
 
   # Enter start log entry:
-  echo `date +%Y-%m-%d`" "`date +%T`" - sending spamassassin shared local configuration (blacklists etc.) "${local_file} >> ${logfile}
+  echo `date +%Y-%m-%d`" "`date +%T`" - sending spamassassin shared local configuration (blacklists etc.) ${local_file} to ${remote_host}" >> ${logfile}
 
   /usr/local/bin/rsync -va --no-r -d -e 'ssh -p '${remote_port} --delete-after --exclude 'CVS' $local_file ${remote_user}@${remote_host}:${remote_file} >> ${logfile}
  
   # Enter end log entry:
-  echo `date +%Y-%m-%d`" "`date +%T`" - sent "${local_file} >> ${logfile}
+  echo `date +%Y-%m-%d`" "`date +%T`" - sent ${remote_host}:${remote_file}" >> ${logfile}
 
 }
 
